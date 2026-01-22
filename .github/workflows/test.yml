@@ -8,55 +8,55 @@ on:
 
 jobs:
   build_and_run:
-  runs-on: ubuntu-latest
+    runs-on: ubuntu-latest
 
-  env:
-    RISCV: ${{ github.workspace }}/riscv
-    # Pin versions so your cache key is stable/reproducible:
-    SPIKE_REF: 6dda4896cb06fb8c2981ae35856e101fa6e8ed13   # commit or tag
-    PK_REF:    9c61d29846d8521d9487a57739330f9682d5b542
+    env:
+      RISCV: ${{ github.workspace }}/riscv
+      # Pin versions so your cache key is stable/reproducible:
+      SPIKE_REF: 6dda4896cb06fb8c2981ae35856e101fa6e8ed13   # commit or tag
+      PK_REF:    9c61d29846d8521d9487a57739330f9682d5b542
 
-  steps:
-    - uses: actions/checkout@v4
+    steps:
+      - uses: actions/checkout@v4
 
-    - name: Restore RISC-V tools cache
-      id: cache-riscv-tools
-      uses: actions/cache@v4
-      with:
-        path: |
-          ${{ env.RISCV }}
-        key: ${{ runner.os }}-riscv-tools-${{ env.SPIKE_REF }}-${{ env.PK_REF }}
-        restore-keys: |
-          ${{ runner.os }}-riscv-tools-
+      - name: Restore RISC-V tools cache
+        id: cache-riscv-tools
+        uses: actions/cache@v4
+        with:
+          path: |
+            ${{ env.RISCV }}
+          key: ${{ runner.os }}-riscv-tools-${{ env.SPIKE_REF }}-${{ env.PK_REF }}
+          restore-keys: |
+            ${{ runner.os }}-riscv-tools-
 
-    - name: Build/install Spike + pk (only on cache miss)
-      if: steps.cache-riscv-tools.outputs.cache-hit != 'true'
-      run: |
-        set -eux
-        sudo apt-get update
-        sudo apt-get install -y git build-essential autoconf automake libtool pkg-config \
-          device-tree-compiler libboost-all-dev \
-          gcc-riscv64-unknown-elf picolibc-riscv64-unknown-elf
+      - name: Build/install Spike + pk (only on cache miss)
+        if: steps.cache-riscv-tools.outputs.cache-hit != 'true'
+        run: |
+          set -eux
+          sudo apt-get update
+          sudo apt-get install -y git build-essential autoconf automake libtool pkg-config \
+            device-tree-compiler libboost-all-dev \
+            gcc-riscv64-unknown-elf picolibc-riscv64-unknown-elf
 
-        mkdir -p "$RISCV"
+          mkdir -p "$RISCV"
 
-        git clone --filter blob:none https://github.com/riscv-software-src/riscv-isa-sim.git
-        git -C riscv-isa-sim checkout "$SPIKE_REF"
-        mkdir -p riscv-isa-sim/build && cd riscv-isa-sim/build
-        ../configure --prefix="$RISCV"
-        make -j"$(nproc)" && make install
-        cd "$GITHUB_WORKSPACE"
+          git clone --filter blob:none https://github.com/riscv-software-src/riscv-isa-sim.git
+          git -C riscv-isa-sim checkout "$SPIKE_REF"
+          mkdir -p riscv-isa-sim/build && cd riscv-isa-sim/build
+          ../configure --prefix="$RISCV"
+          make -j"$(nproc)" && make install
+          cd "$GITHUB_WORKSPACE"
 
-        git clone --filter blob:none https://github.com/riscv-software-src/riscv-pk.git
-        git -C riscv-pk checkout "$PK_REF"
-        mkdir -p riscv-pk/build && cd riscv-pk/build
-        ../configure --prefix="$RISCV" --host=riscv64-unknown-elf
-        make -j"$(nproc)" && make install
-        # pk installs under $RISCV/riscv64-unknown-elf/... :contentReference[oaicite:1]{index=1}
+          git clone --filter blob:none https://github.com/riscv-software-src/riscv-pk.git
+          git -C riscv-pk checkout "$PK_REF"
+          mkdir -p riscv-pk/build && cd riscv-pk/build
+          ../configure --prefix="$RISCV" --host=riscv64-unknown-elf
+          make -j"$(nproc)" && make install
+          # pk installs under $RISCV/riscv64-unknown-elf/... :contentReference[oaicite:1]{index=1}
 
-    - name: Build + run hello
-      run: |
-        set -eux
-        export PATH="$RISCV/bin:$PATH"
-        riscv64-unknown-elf-gcc -march=rv64gc -mabi=lp64d --specs=picolibc.specs -static -O2 -o hello hello.c
-        "$RISCV/bin/spike" --isa=RV64GC "$RISCV/riscv64-unknown-elf/bin/pk" ./hello
+      - name: Build + run hello
+        run: |
+          set -eux
+          export PATH="$RISCV/bin:$PATH"
+          riscv64-unknown-elf-gcc -march=rv64gc -mabi=lp64d --specs=picolibc.specs -static -O2 -o hello hello.c
+          "$RISCV/bin/spike" --isa=RV64GC "$RISCV/riscv64-unknown-elf/bin/pk" ./hello
